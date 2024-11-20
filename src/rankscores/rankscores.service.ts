@@ -6,9 +6,8 @@ import config from '../../data/communities';
 @Injectable()
 export class RankscoresService {
   private readonly PRETRUST_WALLET: string;
-  private readonly PRETRUST_BASE = 0.3;      // Base score for pretrust wallets
-  private readonly VOUCH_WEIGHT = 0.1;       // Weight per vouch
-  private readonly MAX_VOUCH_WEIGHT = 1.0;   // Maximum weight for vouches
+  private readonly PRETRUST_WEIGHT = 0.3;    // Weight for pretrust edges
+  private readonly VOUCH_WEIGHT = 0.1;       // Weight for vouch edges
 
   constructor() {
     if (!process.env.PRETRUST_WALLET) {
@@ -24,30 +23,25 @@ export class RankscoresService {
       const vouchCounts = new Map<string, number>();
       const pretrustNodes = new Set<string>();
 
-      // Add the pretrust wallet with full trust
+      // Add the pretrust wallet
       graph.addNode(this.PRETRUST_WALLET);
       graph.addEdge(this.PRETRUST_WALLET, this.PRETRUST_WALLET, 1.0, 0);
 
-      // 1. First identify pretrust wallets
+      // First identify all pretrust nodes
       const pretrustAttestations = await this.fetchAttestations(
         config.AgoraPass.pretrust_variables.where
       );
-
+      
       for (const attestation of pretrustAttestations) {
         const { recipient } = attestation;
         if (!recipient || typeof recipient !== 'string') continue;
-        
-        graph.addNode(recipient);
-        graph.addEdge(this.PRETRUST_WALLET, recipient, this.PRETRUST_BASE, 0);
         pretrustNodes.add(recipient);
-        
-        if (!nodeScores.has(recipient)) {
-          nodeScores.set(recipient, new Set(['pretrust']));
-          vouchCounts.set(recipient, 0);
-        }
+        graph.addNode(recipient);
+        graph.addEdge(this.PRETRUST_WALLET, recipient, 1.0, 0);
+        nodeScores.set(recipient, new Set(['pretrust']));
       }
 
-      // 2. Then process all vouches
+      // Then add vouch edges with appropriate weights
       const vouchAttestations = await this.fetchAttestations(
         config.AgoraPass.variables.where
       );
@@ -56,7 +50,6 @@ export class RankscoresService {
         const { attester, recipient } = attestation;
         if (!attester || !recipient || typeof attester !== 'string' || typeof recipient !== 'string') continue;
 
-        // Add nodes if needed
         if (!graph.getNodes().includes(attester)) {
           graph.addNode(attester);
         }
@@ -64,46 +57,33 @@ export class RankscoresService {
           graph.addNode(recipient);
         }
 
-        // Track vouch count
+        // Use higher weight if attester is pretrust
+        const weight = pretrustNodes.has(attester) ? this.PRETRUST_WEIGHT : this.VOUCH_WEIGHT;
+        graph.addEdge(attester, recipient, weight, 0);
+        
         vouchCounts.set(recipient, (vouchCounts.get(recipient) || 0) + 1);
         
-        // Add vouch edge with capped weight
-        const vouchWeight = Math.min(this.VOUCH_WEIGHT, this.MAX_VOUCH_WEIGHT);
-        graph.addEdge(attester, recipient, vouchWeight, 0);
-
         if (!nodeScores.has(recipient)) {
           nodeScores.set(recipient, new Set());
         }
         nodeScores.get(recipient)?.add('vouch');
       }
 
-      // Debug information
-      console.log('Graph Analysis:');
-      console.log('Total nodes:', graph.getNodes().length);
-      console.log('Pretrust nodes:', pretrustNodes.size);
-      console.log('Total vouches:', vouchAttestations.length);
-
       // Compute trust scores
       const scores = graph.computeTrustScores(this.PRETRUST_WALLET);
 
-      // Format and sort scores with accumulated weights
+      // Format scores
       const formattedScores = Object.entries(scores)
-        .map(([address, score]) => {
-          const calculatedScore = pretrustNodes.has(address) ? 
-            this.PRETRUST_BASE + Math.min((vouchCounts.get(address) || 0) * this.VOUCH_WEIGHT, this.MAX_VOUCH_WEIGHT - this.PRETRUST_BASE) :
-            Math.min((vouchCounts.get(address) || 0) * this.VOUCH_WEIGHT, this.MAX_VOUCH_WEIGHT);
-          
-          return {
-            address,
-            score: calculatedScore,
-            details: {
-              positive: calculatedScore,  // Use the same calculated score
-              negative: score.negativeScore,
-              sources: nodeScores.get(address) ? Array.from(nodeScores.get(address)) : [],
-              vouchCount: vouchCounts.get(address) || 0
-            }
-          };
-        })
+        .map(([address, score]) => ({
+          address,
+          score: score.positiveScore,
+          details: {
+            positive: score.positiveScore,
+            negative: score.negativeScore,
+            sources: nodeScores.get(address) ? Array.from(nodeScores.get(address)) : [],
+            vouchCount: vouchCounts.get(address) || 0
+          }
+        }))
         .sort((a, b) => b.score - a.score);
 
       return formattedScores;
