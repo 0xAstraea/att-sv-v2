@@ -88,18 +88,22 @@ export class RankscoresService {
 
       // Format and sort scores with accumulated weights
       const formattedScores = Object.entries(scores)
-        .map(([address, score]) => ({
-          address,
-          score: pretrustNodes.has(address) ?
+        .map(([address, score]) => {
+          const calculatedScore = pretrustNodes.has(address) ? 
             this.PRETRUST_BASE + Math.min((vouchCounts.get(address) || 0) * this.VOUCH_WEIGHT, this.MAX_VOUCH_WEIGHT - this.PRETRUST_BASE) :
-            Math.min((vouchCounts.get(address) || 0) * this.VOUCH_WEIGHT, this.MAX_VOUCH_WEIGHT),
-          details: {
-            positive: score.positiveScore,
-            negative: score.negativeScore,
-            sources: nodeScores.get(address) ? Array.from(nodeScores.get(address)) : [],
-            vouchCount: vouchCounts.get(address) || 0
-          }
-        }))
+            Math.min((vouchCounts.get(address) || 0) * this.VOUCH_WEIGHT, this.MAX_VOUCH_WEIGHT);
+          
+          return {
+            address,
+            score: calculatedScore,
+            details: {
+              positive: calculatedScore,  // Use the same calculated score
+              negative: score.negativeScore,
+              sources: nodeScores.get(address) ? Array.from(nodeScores.get(address)) : [],
+              vouchCount: vouchCounts.get(address) || 0
+            }
+          };
+        })
         .sort((a, b) => b.score - a.score);
 
       return formattedScores;
@@ -159,6 +163,21 @@ export class RankscoresService {
 
   async getTopTrustedAddresses(limit = 10) {
     const scores = await this.calculateRankScores();
-    return scores.slice(0, limit);
+    return scores
+      .sort((a, b) => {
+        // First compare by score
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        // If scores are equal, prioritize pretrust addresses
+        const aIsPretrust = a.details.sources.includes('pretrust');
+        const bIsPretrust = b.details.sources.includes('pretrust');
+        if (aIsPretrust !== bIsPretrust) {
+          return bIsPretrust ? 1 : -1;
+        }
+        // If both are pretrust or both are not, compare by vouch count
+        return (b.details.vouchCount || 0) - (a.details.vouchCount || 0);
+      })
+      .slice(0, limit);
   }
 }
