@@ -1,0 +1,1 @@
+export const EASSCAN_BASE_GRAPHQL_URL = "https://base-sepolia.easscan.org/graphql";
