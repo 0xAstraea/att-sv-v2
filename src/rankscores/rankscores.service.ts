@@ -46,9 +46,19 @@ export class RankscoresService {
         config.AgoraPass.variables.where
       );
 
+      // Track unique attester-recipient pairs
+      const processedPairs = new Set<string>();
+
       for (const attestation of vouchAttestations) {
         const { attester, recipient } = attestation;
         if (!attester || !recipient || typeof attester !== 'string' || typeof recipient !== 'string') continue;
+
+        // Create a unique key for this attester-recipient pair
+        const pairKey = `${attester}-${recipient}`;
+        
+        // Skip if we've already processed this pair
+        if (processedPairs.has(pairKey)) continue;
+        processedPairs.add(pairKey);
 
         if (!graph.getNodes().includes(attester)) {
           graph.addNode(attester);

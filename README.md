@@ -58,6 +58,64 @@ $ yarn run test:e2e
 $ yarn run test:cov
 ```
 
+## API Documentation
+
+### Get Community Members
+
+Retrieves all attestations for a specific community with pagination support.
+
+```http
+GET /communities/members?communityId={communityId}&page={page}&limit={limit}
+```
+
+#### Parameters
+
+| Parameter    | Type     | Description                                                                    | Default |
+|-------------|----------|--------------------------------------------------------------------------------|---------|
+| communityId | string   | The ID of the community. Must match a key in the communities configuration.     | -       |
+| page        | number   | The page number for pagination (starts at 1)                                    | 1       |
+| limit       | number   | Number of items per page                                                        | 10      |
+
+#### Available Communities
+- `AgoraPass`
+
+#### Example Requests
+```bash
+# Basic request with default pagination
+curl -X GET 'http://localhost:3000/communities/members?communityId=AgoraPass'
+
+# Request with custom pagination
+curl -X GET 'http://localhost:3000/communities/members?communityId=AgoraPass&page=2&limit=20'
+```
+
+#### Example Response
+```json
+{
+  "data": {
+    "attestations": [
+      {
+        "recipient": "0x1234...",
+        "attester": "0x5678..."
+      }
+      // ... more attestations (up to 'limit' items)
+    ]
+  }
+}
+```
+
+#### Error Responses
+
+| Status Code | Description                                           | Example                                                  |
+|-------------|-------------------------------------------------------|----------------------------------------------------------|
+| 404         | Community not found                                   | `{"message":"Community AgoraCity not found","statusCode":404}` |
+| 500         | Server error (e.g., GraphQL request failed)           | `{"message":"Internal server error","statusCode":500}`        |
+
+#### Pagination Notes
+- Page numbers start at 1
+- If no page is specified, defaults to page 1
+- If no limit is specified, defaults to 10 items per page
+- Maximum items per page is server-configured
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
