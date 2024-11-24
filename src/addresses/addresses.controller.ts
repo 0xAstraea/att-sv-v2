@@ -1,6 +1,5 @@
 import { Controller, Get, Query, Param } from '@nestjs/common';
 import { AddressesService, AttestationCounts } from './addresses.service';
-import { IsEthereumAddress } from 'class-validator';
 
 @Controller('addresses')
 export class AddressesController {

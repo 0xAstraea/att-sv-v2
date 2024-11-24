@@ -123,6 +123,54 @@ curl -X GET 'http://localhost:3000/communities/members?communityId=AgoraPass&pag
 - If no limit is specified, defaults to 10 items per page
 - Maximum items per page is server-configured
 
+### Get Address Attestation Counts
+
+Retrieves the number of attestations given and received by an Ethereum address within a specific community.
+
+```http
+GET /addresses/{address}/attestations?communityId={communityId}
+```
+
+#### Parameters
+
+| Parameter    | Type     | Description                                                                    | Required |
+|-------------|----------|--------------------------------------------------------------------------------|----------|
+| address     | string   | Ethereum address to check (path parameter)                                      | Yes      |
+| communityId | string   | The ID of the community. Must match a key in the communities configuration.     | Yes      |
+
+#### Example Requests
+```bash
+# Get attestation counts for an address in SocialStereo community
+curl -X GET 'http://localhost:3000/addresses/0x742d35Cc6634C0532925a3b844Bc454e4438f44e/attestations?communityId=SocialStereo'
+
+# Get attestation counts for an address in AgoraPass community
+curl -X GET 'http://localhost:3000/addresses/0x742d35Cc6634C0532925a3b844Bc454e4438f44e/attestations?communityId=AgoraPass'
+```
+
+#### Example Response
+```json
+{
+  "data": {
+    "given": 5,     // Number of attestations given by this address
+    "received": 3    // Number of attestations received by this address
+  }
+}
+```
+
+#### Error Responses
+
+| Status Code | Description                                           | Example                                                  |
+|-------------|-------------------------------------------------------|----------------------------------------------------------|
+| 400         | Invalid Ethereum address                              | `{"message":"Invalid address format","statusCode":400}`   |
+| 404         | Community not found                                   | `{"message":"Community AgoraPass not found","statusCode":404}` |
+| 500         | Server error (e.g., GraphQL request failed)           | `{"message":"Internal server error","statusCode":500}`        |
+
+#### Notes
+- The address parameter should be a valid Ethereum address
+- Counts include only non-revoked attestations
+- Attestations are filtered by community-specific parameters (category, subcategory, platform)
+- The response includes both attestations given by the address (as attester) and received by the address (as recipient)
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
