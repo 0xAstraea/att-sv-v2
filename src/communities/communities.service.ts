@@ -12,6 +12,7 @@ export class CommunitiesService {
     communityId: string,
     page: number = 1,
     limit: number = 10,
+    uniqueAttesters: boolean = false
   ): Promise<AttestationResponse> {
     const community = communities[communityId];
     if (!community) {
@@ -20,49 +21,50 @@ export class CommunitiesService {
 
     const skip = (page - 1) * limit;
 
-    const whereClause = {
-      AND: [
-        {
-          decodedDataJson: {
-            contains: ethers.encodeBytes32String(community.category)
-          }
-        },
-        {
-          decodedDataJson: {
-            contains: ethers.encodeBytes32String(community.subcategory)
-          }
-        },
-        {
-          decodedDataJson: {
-            contains: ethers.encodeBytes32String(community.platform)
-          }
-        }
-      ],
-      schemaId: {
-        equals: EAS_CONFIG.VOUCH_SCHEMA
-      },
-      revoked: {
-        equals: false
-      }
-    };
-
     const queryBody = {
       query: `
-        query GetAttestations($where: AttestationWhereInput!, $take: Int!, $skip: Int!) {
-          attestations(where: $where, take: $take, skip: $skip) {
+        query GetAttestations($where: AttestationWhereInput!, $take: Int!, $skip: Int!, $distinct: [AttestationScalarFieldEnum!]) {
+          attestations(
+            where: $where, 
+            take: $take, 
+            skip: $skip,
+            distinct: $distinct
+          ) {
             attester
           }
         }
       `,
       variables: {
-        where: whereClause,
+        where: {
+          OR: [
+            {
+              decodedDataJson: {
+                contains: ethers.encodeBytes32String(community.category)
+              }
+            },
+            {
+              decodedDataJson: {
+                contains: ethers.encodeBytes32String(community.subcategory)
+              }
+            },
+            {
+              decodedDataJson: {
+                contains: ethers.encodeBytes32String(community.platform)
+              }
+            }
+          ],
+          schemaId: {
+            equals: EAS_CONFIG.VOUCH_SCHEMA
+          },
+          revoked: {
+            equals: false
+          }
+        },
         take: limit,
-        skip: skip
+        skip: skip,
+        distinct: uniqueAttesters ? "attester" : undefined
       }
     };
-
-    // Log the query for debugging
-    this.logger.debug('GraphQL Query:', JSON.stringify(queryBody, null, 2));
 
     try {
       const response = await fetch(EAS_CONFIG.GRAPHQL_URL, {
@@ -75,14 +77,12 @@ export class CommunitiesService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.logger.error('GraphQL Error Response:', errorText);
         throw new Error(`GraphQL request failed: ${response.statusText}. Details: ${errorText}`);
       }
 
       const data = await response.json();
       
       if (data.errors) {
-        this.logger.error('GraphQL Errors:', JSON.stringify(data.errors, null, 2));
         throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
       }
 
@@ -91,5 +91,103 @@ export class CommunitiesService {
       this.logger.error('Error in getCommunityMembers:', error);
       throw error;
     }
+  }
+
+  private async getEnsNames(addresses: string[]): Promise<Map<string, string | null>> {
+    try {
+      // Debug log to see what addresses we're querying
+      this.logger.debug('Fetching ENS names for addresses:', addresses);
+
+      const response = await fetch(EAS_CONFIG.GRAPHQL_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `
+            query EnsNames($where: EnsNameWhereInput) {
+              ensNames(where: $where) {
+                id
+                name
+              }
+            }
+          `,
+          variables: {
+            where: {
+              OR: addresses.map(address => ({
+                id: {
+                  equals: address.toLowerCase()
+                }
+              }))
+            }
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`GraphQL request failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Debug log the response
+      this.logger.debug('ENS Response:', JSON.stringify(data, null, 2));
+      
+      if (data.errors) {
+        throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+      }
+
+      // Create a map of address -> ENS name
+      const ensMap = new Map<string, string | null>();
+      
+      // Initialize all addresses with null (keep original case)
+      addresses.forEach(address => ensMap.set(address, null));
+
+      // Update the ones that have ENS names (match by lowercase)
+      data.data.ensNames.forEach((ens: { id: string; name: string }) => {
+        // Find the original address with matching lowercase version
+        const originalAddress = addresses.find(
+          addr => addr.toLowerCase() === ens.id.toLowerCase()
+        );
+        if (originalAddress) {
+          ensMap.set(originalAddress, ens.name);
+        }
+      });
+
+      // Debug log the final map
+      this.logger.debug('ENS Map:', Object.fromEntries(ensMap));
+
+      return ensMap;
+    } catch (error) {
+      this.logger.error(`Error fetching ENS names for addresses:`, error);
+      return new Map(addresses.map(addr => [addr, null]));
+    }
+  }
+
+  async getCommunityMembersWithEns(
+    communityId: string,
+    page: number = 1,
+    limit: number = 10,
+    uniqueAttesters: boolean = false
+  ): Promise<AttestationResponse> {
+    const data = await this.getCommunityMembers(communityId, page, limit, uniqueAttesters);
+    
+    // Get unique attester addresses
+    const attesterAddresses = [...new Set(data.data.attestations.map(a => a.attester))];
+    
+    // Fetch ENS names in batch
+    const ensNames = await this.getEnsNames(attesterAddresses);
+    
+    // Map ENS names back to attestations
+    const attestersWithEns = data.data.attestations.map(attestation => ({
+      ...attestation,
+      ensName: ensNames.get(attestation.attester)
+    }));
+
+    return {
+      data: {
+        attestations: attestersWithEns
+      }
+    };
   }
 }
