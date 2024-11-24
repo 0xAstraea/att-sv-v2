@@ -62,30 +62,36 @@ $ yarn run test:cov
 
 ### Get Community Members
 
-Retrieves all attestations for a specific community with pagination support.
+Retrieves all attestations for a specific community with pagination support and optional ENS resolution.
 
 ```http
-GET /communities/members?communityId={communityId}&page={page}&limit={limit}
+GET /communities/members?communityId={communityId}&page={page}&limit={limit}&includeEns={includeEns}&uniqueAttesters={uniqueAttesters}
 ```
 
 #### Parameters
 
-| Parameter    | Type     | Description                                                                    | Default |
-|-------------|----------|--------------------------------------------------------------------------------|---------|
-| communityId | string   | The ID of the community. Must match a key in the communities configuration.     | -       |
-| page        | number   | The page number for pagination (starts at 1)                                    | 1       |
-| limit       | number   | Number of items per page                                                        | 10      |
+| Parameter       | Type     | Description                                                                    | Default |
+|----------------|----------|--------------------------------------------------------------------------------|---------|
+| communityId    | string   | The ID of the community. Must match a key in the communities configuration.     | -       |
+| page           | number   | The page number for pagination (starts at 1)                                    | 1       |
+| limit          | number   | Number of items per page                                                        | 10      |
+| includeEns     | boolean  | Include ENS names for attesters if available                                    | false   |
+| uniqueAttesters| boolean  | Only return unique attesters (removes duplicates)                               | false   |
 
 #### Available Communities
 - `AgoraPass`
+- `SocialStereo`
 
 #### Example Requests
 ```bash
 # Basic request with default pagination
 curl -X GET 'http://localhost:3000/communities/members?communityId=AgoraPass'
 
-# Request with custom pagination
-curl -X GET 'http://localhost:3000/communities/members?communityId=AgoraPass&page=2&limit=20'
+# Request with ENS resolution and unique attesters
+curl -X GET 'http://localhost:3000/communities/members?communityId=AgoraPass&includeEns=true&uniqueAttesters=true'
+
+# Request with all options
+curl -X GET 'http://localhost:3000/communities/members?communityId=AgoraPass&page=2&limit=20&includeEns=true&uniqueAttesters=true'
 ```
 
 #### Example Response
@@ -95,7 +101,8 @@ curl -X GET 'http://localhost:3000/communities/members?communityId=AgoraPass&pag
     "attestations": [
       {
         "recipient": "0x1234...",
-        "attester": "0x5678..."
+        "attester": "0x5678...",
+        "ensName": "vitalik.eth"  // Only present if includeEns=true
       }
       // ... more attestations (up to 'limit' items)
     ]
