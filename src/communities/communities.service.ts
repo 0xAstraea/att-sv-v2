@@ -50,7 +50,6 @@ export class CommunitiesService {
       query: `
         query GetAttestations($where: AttestationWhereInput!, $take: Int!, $skip: Int!) {
           attestations(where: $where, take: $take, skip: $skip) {
-            recipient
             attester
           }
         }
