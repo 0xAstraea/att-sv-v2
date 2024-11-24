@@ -1,9 +1,18 @@
 import { Controller, Get, Query, Param } from '@nestjs/common';
-import { AddressesService, AttestationCounts } from './addresses.service';
+import { AddressesService, AttestationCounts, AddressDetails } from './addresses.service';
 
 @Controller('addresses')
 export class AddressesController {
   constructor(private readonly addressesService: AddressesService) {}
+
+  @Get(':address')
+  async getAddressDetails(
+    @Param('address') address: string,
+    @Query('communityId') communityId: string,
+  ): Promise<{ data: AddressDetails }> {
+    const details = await this.addressesService.getAddressDetails(address, communityId);
+    return { data: details };
+  }
 
   @Get(':address/attestations')
   async getAttestationCounts(
