@@ -38,7 +38,7 @@ export interface CommunityLink {
     BuilderMonastery: {
       name: "Builder Monastery",
       description: "Builder Monastery offers a focused environment where individuals can work on difficult problems. This space fosters collaboration, curiosity, and craftsmanship. Builder Monastery is designed to ensure everyone can engage fully, without fear of missing out on key experiences. ",
-      category: "Devcon",
+      category: "BuilderMonastery",
       subcategory: "-",
       platform: "Stamp",
       links: [
