@@ -178,4 +178,58 @@ export class AddressesService {
       return null;
     }
   }
+
+  async getDetailsByEns(ensName: string, communityId: string): Promise<AddressDetails> {
+    this.logger.debug(`Getting details for ENS name ${ensName} in community ${communityId}`);
+    
+    const address = await this.getAddressFromEns(ensName);
+    if (!address) {
+      throw new NotFoundException(`ENS name ${ensName} not found`);
+    }
+
+    return this.getAddressDetails(address, communityId);
+  }
+
+  private async getAddressFromEns(ensName: string): Promise<string | null> {
+    try {
+      const response = await fetch(EAS_CONFIG.GRAPHQL_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `
+            query FindFirstEnsName($where: EnsNameWhereInput) {
+              findFirstEnsName(where: $where) {
+                name
+                id
+              }
+            }
+          `,
+          variables: {
+            where: {
+              name: {
+                contains: ensName.toLowerCase()
+              }
+            }
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`GraphQL request failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.errors) {
+        throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+      }
+
+      return data.data.findFirstEnsName?.id || null;
+    } catch (error) {
+      this.logger.error(`Error fetching address for ENS ${ensName}:`, error);
+      return null;
+    }
+  }
 }

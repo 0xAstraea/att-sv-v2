@@ -22,4 +22,13 @@ export class AddressesController {
     const counts = await this.addressesService.getAttestationCounts(address, communityId);
     return { data: counts };
   }
+
+  @Get('ens/:ensName')
+  async getDetailsByEns(
+    @Param('ensName') ensName: string,
+    @Query('communityId') communityId: string,
+  ): Promise<{ data: AddressDetails }> {
+    const details = await this.addressesService.getDetailsByEns(ensName, communityId);
+    return { data: details };
+  }
 }
