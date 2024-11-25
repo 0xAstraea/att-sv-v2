@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransitiveTrustGraph } from '@ethereum-attestation-service/transitive-trust-sdk';
-import { EASSCAN_BASE_GRAPHQL_URL } from '../../config/config';
+import { EAS_CONFIG } from '../../config/config';
 import config from '../../data/communities';
 
 @Injectable()
@@ -105,7 +105,7 @@ export class RankscoresService {
 
   private async fetchAttestations(whereClause: any) {
     try {
-      const response = await fetch(EASSCAN_BASE_GRAPHQL_URL, {
+      const response = await fetch(EAS_CONFIG.GRAPHQL_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

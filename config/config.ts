@@ -1,5 +1,3 @@
-export const EASSCAN_BASE_GRAPHQL_URL = "https://base-sepolia.easscan.org/graphql";
-
 export const EAS_CONFIG = {
     chainId: 8453,
     EAS_CONTRACT_ADDRESS: "0x4200000000000000000000000000000000000021",
